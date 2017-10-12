@@ -8,7 +8,6 @@ import android.support.annotation.AttrRes;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
-import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -25,23 +24,23 @@ public class HaloRingRefreshLayout extends FrameLayout {
     AttributeSet mAttributeSet;
     View mChildView;
     HaloRingAnimation mHeaderView;
-    float mInitialDownY;//手指按下的位置
-    float mTouchSlop = 8;//最小滑动值,用来判断拖动是否有效
-    float mInitialMotionY;//开始滑动的位置
-    float mMaxDragDistance = 280;//childView的最大移动距离
-    float mPercent = 0.01f;//当前拖动的百分比
-    float dragRatio = 0.3f;//拖动阻力
-    ValueAnimator mBackUpValueAnimator;
-    long BACK_UP_DURATION = 350;//返回向上的持续时间
-    boolean mIsRefreshing = false;//正在刷新的标记
-    boolean mIsBeingDragged = false;//是否开始滑动
-    boolean mPullEnd;//下拉到位的标记
-    float overScrollTop;//当前childView移动的距离
-    int mRingRadius;
-    int mRingColor;
-    float mHeaderHeight;
-    int mPointColor;
-    int mRingTop;
+    private float mInitialDownY;//手指按下的位置
+    private float mTouchSlop = 8;//最小滑动值,用来判断拖动是否有效
+    private float mInitialMotionY;//开始滑动的位置
+    private float mMaxDragDistance = 280;//childView的最大移动距离
+    private float mPercent = 0.00f;//当前拖动的百分比
+    private float dragRatio = 0.3f;//拖动阻力
+    private ValueAnimator mBackUpValueAnimator;//向上返回的动画
+    private long BACK_UP_DURATION = 350;//返回向上的持续时间
+    private boolean mIsRefreshing = false;//正在刷新的标记
+    private boolean mIsBeingDragged = false;//是否开始滑动
+    private boolean mPullEnd;//下拉到位的标记
+    private float overScrollTop;//当前childView移动的距离
+    private int mRingRadius;//0光环的半径
+    private int mRingColor;//光环的颜色
+    private float mHeaderHeight;//光环的整体view的高度
+    private int mPointColor;//形成光环的点的颜色
+    private int mRingTop;//光环距离上部的高度
 
 
     public HaloRingRefreshLayout(@NonNull Context context) {
@@ -59,6 +58,7 @@ public class HaloRingRefreshLayout extends FrameLayout {
         init(context, attrs);
     }
 
+    //进行一些初始化操作
     private void init(Context context, AttributeSet attributeSet) {
         mContext = context;
         mAttributeSet = attributeSet;
@@ -75,6 +75,7 @@ public class HaloRingRefreshLayout extends FrameLayout {
         });
 
         mBackUpValueAnimator = new ValueAnimator();
+        //对返回动画设置一个插值器
         mBackUpValueAnimator.setInterpolator(new Interpolator() {
             @Override
             public float getInterpolation(float input) {
@@ -117,6 +118,7 @@ public class HaloRingRefreshLayout extends FrameLayout {
         });
     }
 
+    //添加HaloRingAnimation,并进行一些初始化
     private void addHeaderView() {
         mHeaderView = new HaloRingAnimation(mContext);
         mHeaderView.setRingRadius(mRingRadius);
@@ -136,6 +138,7 @@ public class HaloRingRefreshLayout extends FrameLayout {
 
     @Override
     public void addView(View child) {
+        //确保只能添加一个view
         if (getChildCount() >= 1) {
             throw new RuntimeException("you can only attach one child");
         }
@@ -155,13 +158,10 @@ public class HaloRingRefreshLayout extends FrameLayout {
                 mInitialDownY = event.getY();
                 mIsBeingDragged = false;
                 mHeaderView.setEndpull(false);
-                Log.d("HaloRingRefreshLayout", "onInterceptTouchEvent: ACTION_DOWN");
                 break;
             case MotionEvent.ACTION_MOVE:
                 float y = event.getY();
                 startDragging(y);
-                Log.d("HaloRingRefreshLayout", "onInterceptTouchEvent: ACTION_MOVE");
-
                 if (mIsBeingDragged)
                     return true;
         }
@@ -216,13 +216,14 @@ public class HaloRingRefreshLayout extends FrameLayout {
         return true;
     }
 
+    //获取当前移动的百分比,并调整滑动阻力
     private void fingerMove(float overScrollTop) {
         float originalDragPercent = overScrollTop / mMaxDragDistance;//确定当前移动的百分比
         mPercent = Math.min(1f, Math.abs(originalDragPercent));
         dragRatio = 0.5f - 0.15f * mPercent;//产生拖动的阻力效果
 
     }
-
+    //判断是否在滑动
     private void startDragging(float y) {
         final float yDiff = y - mInitialDownY;
         if (yDiff > mTouchSlop && !mIsBeingDragged) {
@@ -231,14 +232,15 @@ public class HaloRingRefreshLayout extends FrameLayout {
             mPullEnd = false;
         }
     }
+
     private void getAttrs() {
         TypedArray typedArray = mContext.obtainStyledAttributes(mAttributeSet, R.styleable.HaloRingRefreshLayout);
         mRingRadius = (int) typedArray.getDimension(R.styleable.HaloRingRefreshLayout_ringRadius, 50);
         mRingTop = (int) typedArray.getDimension(R.styleable.HaloRingRefreshLayout_ringTop, 120);
         mRingColor = typedArray.getColor(R.styleable.HaloRingRefreshLayout_ringColor, 0xFF828EFA);
-        mHeaderHeight = typedArray.getDimension(R.styleable.HaloRingRefreshLayout_headerHeight,mMaxDragDistance);
+        mHeaderHeight = typedArray.getDimension(R.styleable.HaloRingRefreshLayout_headerHeight, mMaxDragDistance);
         mPointColor = typedArray.getColor(R.styleable.HaloRingRefreshLayout_pointColor, 0xFF828EFA);
-        mMaxDragDistance=mHeaderHeight;
+        mMaxDragDistance = mHeaderHeight;
         typedArray.recycle();
 
 

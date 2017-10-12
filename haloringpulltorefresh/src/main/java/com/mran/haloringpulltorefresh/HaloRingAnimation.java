@@ -23,21 +23,19 @@ public class HaloRingAnimation extends View {
     private Paint mRingPaint;
     private int width;
     private int height;
-    private int mRingTop ;
+    private int mRingTop;//圆环到上侧的距离
+    private int mRingRadius;//圆环的半径,可变
+    private int mRingColor;//圆环的颜色
+    private int mPointColor;//点的颜色
+    int mRingRadiusONLY;//圆环的半径,不变
 
-    private int mRingRadius;
-    private int mRingColor;
-    private float mHeight;
-    private int mPointColor;
-    int mRingRadiusONLY;
-
-    private float mPercent = 0.01f;//0->1
+    private float mPercent = 0.00f;//0->1//距离百分比
     private Context mContext;
     private ArrayList<HaloPoint> mHaloPoints;
-    private float time = 0.5f;
+    private float mHalfPercent = 0.5f;
     private float timeRationAlpha = 0;//能随时间改变的透明度
     private float timeRationRadius = 0;//能随时间改变的半径
-    private boolean mPullEnd = false;
+    private boolean mPullEnd = false;//标记位
     PathMeasure pathMeasure;
     AttributeSet mAttributeSet;
     ValueAnimator mPointAlphaRadiusValueAnimator;
@@ -63,7 +61,7 @@ public class HaloRingAnimation extends View {
 
         pathMeasure = new PathMeasure(null, false);
         mHaloPoints = new ArrayList<>();
-        for (int i = 0; i < 360; i ++) {
+        for (int i = 0; i < 360; i++) {
             HaloPoint haloPoint = new HaloPoint();
             haloPoint.setPos(width / 4 + (float) (Math.random() * width / 2), 0);
             haloPoint.setRadius((float) (2 + Math.random() * 3));
@@ -79,7 +77,7 @@ public class HaloRingAnimation extends View {
             public void onAnimationUpdate(ValueAnimator animation) {
                 timeRationAlpha = (float) animation.getAnimatedValue();
                 timeRationRadius = (float) animation.getAnimatedValue() * 0.05f;
-                mRingRadius = (int) ((float) animation.getAnimatedValue() * 0.1f + mRingRadiusONLY-5);
+                mRingRadius = (int) ((float) animation.getAnimatedValue() * 0.1f + mRingRadiusONLY - 5);
                 invalidate();
             }
         });
@@ -106,19 +104,19 @@ public class HaloRingAnimation extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        width = getSize(300, widthMeasureSpec);/*bottombar的宽度*/
-        height = getSize(300, heightMeasureSpec);/*--的高度*/
+        width = getSize(300, widthMeasureSpec);/*宽度*/
+        height = getSize(300, heightMeasureSpec);/*高度*/
         if (mHaloPoints != null)
-            for (int i = 0; i <360; i++) {
+            for (int i = 0; i < 360; i++) {
                 HaloPoint haloPoint = mHaloPoints.get(i);
-                haloPoint.setRadius((float) (1 + Math.random() * 3));
-                setStartPos((float) (Math.random() * width), -5, haloPoint.pos);
-                setEndPos(width / 2, mRingTop + mRingRadius, -90 + i, haloPoint.endPos);
-                haloPoint.mPath = setPath(haloPoint.pos, haloPoint.endPos);
-                pathMeasure.setPath(haloPoint.mPath, false);
-                haloPoint.length = pathMeasure.getLength();
-                haloPoint.startRatio = i > 180 ? (1 - (i / 360.0f)) : time / 180 * i;//设置point应该何时出现
-                haloPoint.alpha = 100 + (int) (50 * Math.random());
+                haloPoint.setRadius((float) (1 + Math.random() * 3));//初始化点的大小
+                setStartPos((float) (Math.random() * width), -5, haloPoint.pos);//初始化点的位置
+                setEndPos(width / 2, mRingTop + mRingRadius, -90 + i, haloPoint.endPos);//初始化点移动的结束位置
+                haloPoint.mPath = setPath(haloPoint.pos, haloPoint.endPos);//初始化点移动的路径path
+                pathMeasure.setPath(haloPoint.mPath, false);//将path进行测量
+                haloPoint.length = pathMeasure.getLength();//获取path的总长度
+                haloPoint.startRatio = i > 180 ? (1 - (i / 360.0f)) : mHalfPercent / 180 * i;//设置point应该何时出现
+                haloPoint.alpha = 100 + (int) (50 * Math.random());//点的变化透明度
             }
 
     }
@@ -142,16 +140,19 @@ public class HaloRingAnimation extends View {
         return mySize;
     }
 
+    //初始化点的起始坐标
     void setStartPos(float xDot, float yDot, float pos[]) {
         pos[0] = xDot;
         pos[1] = yDot;
     }
 
+    //确定点移动结束后在圆上的坐标
     void setEndPos(int xDot, int yDot, int radius, float pos[]) {
-        pos[0] = (float) (xDot + mRingRadius * (Math.cos(radius * Math.PI / 180)));
+        pos[0] = (float) (xDot + mRingRadius * (Math.cos(radius * Math.PI / 180)));//
         pos[1] = (float) (yDot + mRingRadius * (Math.sin(radius * Math.PI / 180)));
     }
 
+    //设置点的移动路径
     private Path setPath(float startPos[], float endPos[]) {
         Path path = new Path();
         path.moveTo(startPos[0], startPos[1]);
@@ -166,31 +167,34 @@ public class HaloRingAnimation extends View {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         if (!mPullEnd) {
-            for (int i = 0; i < 360; i+=5) {//调整i的间隔数可以实现不同的效果
+            for (int i = 0; i < 360; i += 5) {//调整i的间隔数可以实现不同的效果
                 HaloPoint haloPoint = mHaloPoints.get(i);
                 haloPoint.drawAble = haloPoint.startRatio < mPercent;
+                //将需要显示的点显示出来
                 if (!haloPoint.drawAble)
                     continue;
+                //确定点的位置
                 pathMeasure.setPath(haloPoint.mPath, false);
-                pathMeasure.getPosTan(haloPoint.length * (mPercent - haloPoint.startRatio) / time, haloPoint.pos, null);
+                pathMeasure.getPosTan(haloPoint.length * (mPercent - haloPoint.startRatio) / mHalfPercent, haloPoint.pos, null);
                 int alpha = Math.min((int) (haloPoint.alpha + i + timeRationAlpha), 255);
                 mPointPaint.setAlpha(alpha);
 
                 float pointRadius;
+                //产生点在不同时刻大小不断变化的效果
                 if (i % 2 == 0)
-                    pointRadius = (float) (timeRationRadius * ((Math.cos((mPercent - haloPoint.startRatio) / time * 100))) + 6);
+                    pointRadius = (float) (timeRationRadius * ((Math.cos((mPercent - haloPoint.startRatio) / mHalfPercent * 100))) + 6);
                 else
-                    pointRadius = (float) (timeRationRadius * (Math.abs(Math.sin((mPercent - haloPoint.startRatio) / time * 100))) + 4);
-
-                if ((mPercent - haloPoint.startRatio) / time >= 1) {
+                    pointRadius = (float) (timeRationRadius * (Math.abs(Math.sin((mPercent - haloPoint.startRatio) / mHalfPercent * 100))) + 4);
+                //当点移动到位时,透明度,大小还有阴影都不再发生变化
+                if ((mPercent - haloPoint.startRatio) / mHalfPercent >= 1) {
                     pointRadius = 7;
                     mPointPaint.setAlpha(255);
                     mPointPaint.clearShadowLayer();
                 }
-//                haloPoint.radius = mPointRadius;
                 canvas.drawCircle(haloPoint.pos[0], haloPoint.pos[1], pointRadius, mPointPaint);
             }
         } else {
+            //当下拉到位时,画出圆环
             canvas.drawCircle(width / 2, mRingTop + mRingRadiusONLY, mRingRadius, mRingPaint);
         }
     }
@@ -226,9 +230,10 @@ public class HaloRingAnimation extends View {
     public int getRingRadius() {
         return mRingRadius;
     }
+
     public void setRingRadius(int ringRadius) {
         mRingRadius = ringRadius;
-        mRingRadiusONLY=ringRadius;
+        mRingRadiusONLY = ringRadius;
     }
 
     public int getRingColor() {
