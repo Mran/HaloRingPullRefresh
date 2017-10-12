@@ -7,9 +7,19 @@
     android:layout_height="match_parent"
     tools:context="com.mran.halo.MainActivity">
 
-    <com.mran.haloringpulltorefresh.HaloRingAnimation
-        android:background="@color/colorb"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"/>
 
+    <com.mran.haloringpulltorefresh.HaloRingRefreshLayout
+        android:id="@+id/haloring"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/colorb"
+        app:headerHeight="120dp"
+        app:ringRadius="20dp"
+        app:ringTop="50dp">
+
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/recyclerview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"/>
+    </com.mran.haloringpulltorefresh.HaloRingRefreshLayout>
 </android.support.constraint.ConstraintLayout>

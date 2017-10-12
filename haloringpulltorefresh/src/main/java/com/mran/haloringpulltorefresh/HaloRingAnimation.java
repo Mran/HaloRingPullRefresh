@@ -1,5 +1,6 @@
 package com.mran.haloringpulltorefresh;
 
+import android.animation.ValueAnimator;
 import android.annotation.TargetApi;
 import android.content.Context;
 import android.graphics.Canvas;
@@ -9,8 +10,6 @@ import android.graphics.PathMeasure;
 import android.os.Build;
 import android.support.annotation.Nullable;
 import android.util.AttributeSet;
-import android.util.Log;
-import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
@@ -20,28 +19,32 @@ import java.util.ArrayList;
  */
 
 public class HaloRingAnimation extends View {
-    private Paint mPaint;
-    int width;
-    int height;
-    int CICLE = 120;
-    int mRingRadius;
-    Path mPath;
-    int startAngle = 270;//270->90
-    int sweepAngle = 0;//0->360
-    float ratio = 0.01f;//0->1
+    private Paint mPointPaint;
+    private Paint mRingPaint;
+    private int width;
+    private int height;
+    private int mRingTop ;
+
+    private int mRingRadius;
+    private int mRingColor;
+    private float mHeight;
+    private int mPointColor;
+    int mRingRadiusONLY;
+
+    private float mPercent = 0.01f;//0->1
     private Context mContext;
-    private AttributeSet mAttributeSet;
     private ArrayList<HaloPoint> mHaloPoints;
-    float lasty = 0;
-    boolean endPull = true;
-    float mInitialDownY;//手指按下的位置
-    float mTouchSlop = 8;//最小滑动值
-    boolean mIsBeingDragged = false;//是否开始滑动
-    float mInitialMotionY;//开始滑动的位置
-    float mTotalDragDistance = 100;
+    private float time = 0.5f;
+    private float timeRationAlpha = 0;//能随时间改变的透明度
+    private float timeRationRadius = 0;//能随时间改变的半径
+    private boolean mPullEnd = false;
+    PathMeasure pathMeasure;
+    AttributeSet mAttributeSet;
+    ValueAnimator mPointAlphaRadiusValueAnimator;
 
     public HaloRingAnimation(Context context) {
         super(context);
+        init(context, null);
     }
 
     public HaloRingAnimation(Context context, @Nullable AttributeSet attrs) {
@@ -54,49 +57,69 @@ public class HaloRingAnimation extends View {
         init(context, attrs);
     }
 
-    void init(Context context, AttributeSet attrs) {
-        mRingRadius = 50;
+    private void init(Context context, AttributeSet attrs) {
         mContext = context;
         mAttributeSet = attrs;
-        mPaint = new Paint();
-        mPaint.setColor(0xFF3C49FF);
-        mPaint.setAntiAlias(true);
-        mPaint.setStyle(Paint.Style.STROKE);
-        mPaint.setStrokeWidth(8);
-        mPaint.setStrokeCap(Paint.Cap.ROUND);
-        mPaint.setShadowLayer(20, 0, 0, 0xFF3C49FF);
-        mPath = new Path();
-        mPaint.setTextSize(20);
-        pathMeasure = new PathMeasure(mPath, false);
+
+        pathMeasure = new PathMeasure(null, false);
         mHaloPoints = new ArrayList<>();
-        for (int i = 0; i < 360; i++) {
+        for (int i = 0; i < 360; i ++) {
             HaloPoint haloPoint = new HaloPoint();
-            haloPoint.setPos((float) (Math.random() * width), (float) (10 * Math.random()));
+            haloPoint.setPos(width / 4 + (float) (Math.random() * width / 2), 0);
             haloPoint.setRadius((float) (2 + Math.random() * 3));
             mHaloPoints.add(haloPoint);
         }
+        mPointAlphaRadiusValueAnimator = new ValueAnimator();
+        mPointAlphaRadiusValueAnimator.setDuration(800);
+        mPointAlphaRadiusValueAnimator.setFloatValues(100);
+        mPointAlphaRadiusValueAnimator.setRepeatCount(ValueAnimator.INFINITE);
+        mPointAlphaRadiusValueAnimator.setRepeatMode(ValueAnimator.REVERSE);
+        mPointAlphaRadiusValueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator animation) {
+                timeRationAlpha = (float) animation.getAnimatedValue();
+                timeRationRadius = (float) animation.getAnimatedValue() * 0.05f;
+                mRingRadius = (int) ((float) animation.getAnimatedValue() * 0.1f + mRingRadiusONLY-5);
+                invalidate();
+            }
+        });
     }
 
-    PathMeasure pathMeasure;
-    float time = 0.5f;
+    public void initParams() {
+
+        mPointPaint = new Paint();
+        mPointPaint.setAntiAlias(true);
+        mPointPaint.setStrokeWidth(8);
+        mPointPaint.setColor(mPointColor);
+        mPointPaint.setStyle(Paint.Style.FILL);
+        mPointPaint.setShadowLayer(6, 0, 0, mPointColor);
+
+        mRingPaint = new Paint();
+        mRingPaint.setAntiAlias(true);
+        mRingPaint.setColor(mRingColor);
+        mRingPaint.setShadowLayer(6, 0, 0, mRingColor);
+        mRingPaint.setStyle(Paint.Style.STROKE);
+        mRingPaint.setStrokeWidth(12);
+
+    }
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         width = getSize(300, widthMeasureSpec);/*bottombar的宽度*/
         height = getSize(300, heightMeasureSpec);/*--的高度*/
-
-        for (int i = 0; i < 360; i++) {
-            HaloPoint haloPoint = mHaloPoints.get(i);
-            haloPoint.setRadius((float) (1 + Math.random() * 3));
-            setStartPos((float) (Math.random() * width), -5, haloPoint.pos);
-            setEndPos(width / 2, CICLE + mRingRadius, -90 + i, haloPoint.endPos);
-            haloPoint.mPath = setPath(haloPoint.pos, haloPoint.endPos);
-            pathMeasure.setPath(haloPoint.mPath, false);
-            haloPoint.length = pathMeasure.getLength();
-            haloPoint.startRatio = i > 180 ? (1 - (i / 360.0f)) : time / 180 * i;
-            Log.d("HaloRingAnimation", "onMeasure: startRatio" + haloPoint.startRatio + "---i=" + i);
-        }
+        if (mHaloPoints != null)
+            for (int i = 0; i <360; i++) {
+                HaloPoint haloPoint = mHaloPoints.get(i);
+                haloPoint.setRadius((float) (1 + Math.random() * 3));
+                setStartPos((float) (Math.random() * width), -5, haloPoint.pos);
+                setEndPos(width / 2, mRingTop + mRingRadius, -90 + i, haloPoint.endPos);
+                haloPoint.mPath = setPath(haloPoint.pos, haloPoint.endPos);
+                pathMeasure.setPath(haloPoint.mPath, false);
+                haloPoint.length = pathMeasure.getLength();
+                haloPoint.startRatio = i > 180 ? (1 - (i / 360.0f)) : time / 180 * i;//设置point应该何时出现
+                haloPoint.alpha = 100 + (int) (50 * Math.random());
+            }
 
     }
 
@@ -129,11 +152,11 @@ public class HaloRingAnimation extends View {
         pos[1] = (float) (yDot + mRingRadius * (Math.sin(radius * Math.PI / 180)));
     }
 
-    Path setPath(float startPos[], float endPos[]) {
+    private Path setPath(float startPos[], float endPos[]) {
         Path path = new Path();
         path.moveTo(startPos[0], startPos[1]);
-        path.quadTo((float) (Math.random() * width), (float) (Math.random() * CICLE), (float) (endPos[0] * Math.random()), (float) (endPos[1] * Math.random()));
-        path.quadTo((float) (Math.random() * width), (float) (Math.random() * CICLE), endPos[0], endPos[1]);
+        path.quadTo((float) (Math.random() * width), (float) (Math.random() * mRingTop), (float) width / 4 + (float) (Math.random() * width / 2), (float) (Math.random() * mRingTop));
+        path.quadTo((float) (Math.random() * width), (float) (Math.random() * mRingTop), endPos[0], endPos[1]);
 //        path.lineTo(endPos[0], endPos[1]);
         return path;
     }
@@ -142,130 +165,94 @@ public class HaloRingAnimation extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-
-        if (mIsBeingDragged) {
-            if (ratio >= 1)
-                ratio = 1;
-            mPaint.setColor(0xff4f5ff3);
-            for (int i = 0; i < 360; i += 6) {
+        if (!mPullEnd) {
+            for (int i = 0; i < 360; i+=5) {//调整i的间隔数可以实现不同的效果
                 HaloPoint haloPoint = mHaloPoints.get(i);
-                mPaint.setStyle(Paint.Style.FILL);
-                haloPoint.drawAble = haloPoint.startRatio < ratio;
-
+                haloPoint.drawAble = haloPoint.startRatio < mPercent;
+                if (!haloPoint.drawAble)
+                    continue;
                 pathMeasure.setPath(haloPoint.mPath, false);
-                pathMeasure.getPosTan(haloPoint.length * (ratio - haloPoint.startRatio) / time, haloPoint.pos, null);
-//                canvas.drawPoints(haloPoint.pos, mPaint);
-//                if (ratio <= haloPoint.startRatio)
-                haloPoint.radius = (float) (Math.abs(Math.sin((ratio - haloPoint.startRatio) / time * 100)) * 5 + 1);
-//                if (haloPoint.pos[0] == haloPoint.endPos[0] && haloPoint.pos[1] == haloPoint.endPos[1])
-//                    haloPoint.radius = 5;
-                canvas.drawCircle(haloPoint.pos[0], haloPoint.pos[1], haloPoint.radius, mPaint);
+                pathMeasure.getPosTan(haloPoint.length * (mPercent - haloPoint.startRatio) / time, haloPoint.pos, null);
+                int alpha = Math.min((int) (haloPoint.alpha + i + timeRationAlpha), 255);
+                mPointPaint.setAlpha(alpha);
 
-            }
-            {
-                mPaint.setColor(0xFFFFEA00);
-                HaloPoint haloPoint = mHaloPoints.get(180);
-                haloPoint.drawAble = haloPoint.startRatio < ratio;
+                float pointRadius;
+                if (i % 2 == 0)
+                    pointRadius = (float) (timeRationRadius * ((Math.cos((mPercent - haloPoint.startRatio) / time * 100))) + 6);
+                else
+                    pointRadius = (float) (timeRationRadius * (Math.abs(Math.sin((mPercent - haloPoint.startRatio) / time * 100))) + 4);
 
-                pathMeasure.setPath(haloPoint.mPath, false);
-                pathMeasure.getPosTan(haloPoint.length * (ratio - haloPoint.startRatio) / time, haloPoint.pos, null);
-//                canvas.drawPoints(haloPoint.pos, mPaint);
-                haloPoint.radius = (float) (3 + Math.random() * 1);
-                canvas.drawCircle(haloPoint.pos[0], haloPoint.pos[1], haloPoint.radius - 1, mPaint);
-                Log.d("HaloRingAnimation", "onDraw:length " + haloPoint.length * (ratio - haloPoint.startRatio) / time);
-                mPaint.setStrokeWidth(8);
-                mPaint.setStyle(Paint.Style.FILL);
-                canvas.drawText(String.valueOf(haloPoint.length * (ratio - haloPoint.startRatio) / time), 30, 50, mPaint);
-                mPaint.setStyle(Paint.Style.STROKE);
-            }
-            if (mHaloPoints.get(180).drawAble)
-                Log.d("HaloRingAnimation", "onDraw:length " + mHaloPoints.get(180).length * (ratio - mHaloPoints.get(180).startRatio) / time);
-        }
-        mPaint.setStrokeWidth(8);
-        mPaint.setStyle(Paint.Style.FILL);
-        canvas.drawText(String.valueOf(ratio), 30, 30, mPaint);
-        mPaint.setStyle(Paint.Style.STROKE);
-
-        if (endPull) {
-            mPaint.setColor(0xFF3C49FF);
-            startAngle = (int) (270 - 180 * ratio);
-            sweepAngle = (int) (360 * ratio);
-            mPath.addArc(width / 2 - mRingRadius, CICLE, width / 2 + mRingRadius, CICLE + mRingRadius * 2, startAngle, sweepAngle);
-//            canvas.drawPath(mPath, mPaint);
-            mPath.reset();
-
-        }
-    }
-
-    @Override
-    public boolean dispatchTouchEvent(MotionEvent event) {
-        int action = event.getAction();
-        switch (action) {
-            case MotionEvent.ACTION_DOWN:
-                lasty = event.getY();
-                mIsBeingDragged = false;
-                mInitialDownY = event.getY();
-                Log.d("HaloRingAnimation", "dispatchTouchEvent:ACTION_DOWN ");
-                return true;
-
-            case MotionEvent.ACTION_MOVE:
-                Log.d("HaloRingAnimation", "dispatchTouchEvent:ACTION_MOVE ");
-                float y = event.getY();
-                startDragging(y);
-
-                if (mIsBeingDragged) {
-
-                    final float overscrollTop = (y - mInitialMotionY) * dragRatio;
-                    if (overscrollTop > 0) {
-                        finggerMove(overscrollTop);
-                    } else {
-                        return false;
-                    }
+                if ((mPercent - haloPoint.startRatio) / time >= 1) {
+                    pointRadius = 7;
+                    mPointPaint.setAlpha(255);
+                    mPointPaint.clearShadowLayer();
                 }
-                invalidate();
-                break;
-            default:
-                break;
-        }
-        return super.dispatchTouchEvent(event);
-    }
-
-    float dragRatio = 0.3f;
-
-    private void finggerMove(float overscrollTop) {
-        float originalDragPercent = overscrollTop / mTotalDragDistance;
-
-        float dragPercent = Math.min(1f, Math.abs(originalDragPercent));
-//        ratio= (float) Math.log(dragPercent*9+1);
-        ratio = dragPercent;
-        dragRatio = 0.25f - 0.1f * ratio;
-
-    }
-
-    private void startDragging(float y) {
-        final float yDiff = y - mInitialDownY;
-        if (yDiff > mTouchSlop && !mIsBeingDragged) {
-            mInitialMotionY = mInitialDownY + mTouchSlop;
-            mIsBeingDragged = true;
+//                haloPoint.radius = mPointRadius;
+                canvas.drawCircle(haloPoint.pos[0], haloPoint.pos[1], pointRadius, mPointPaint);
+            }
+        } else {
+            canvas.drawCircle(width / 2, mRingTop + mRingRadiusONLY, mRingRadius, mRingPaint);
         }
     }
 
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
 
-        int action = event.getAction();
-        switch (action) {
-            case MotionEvent.ACTION_DOWN:
-                Log.d("HaloRingAnimation", "onTouchEvent:ACTION_DOWN ");
-                break;
-            case MotionEvent.ACTION_MOVE:
-                Log.d("HaloRingAnimation", "onTouchEvent:ACTION_MOVE ");
+    public void setPercent(float percent) {
+        this.mPercent = percent;
+    }
 
-                break;
-            default:
-                break;
+    public void startAnimation() {
+        mPointAlphaRadiusValueAnimator.start();
+    }
+
+    public boolean isAnimationRunning() {
+        return mPointAlphaRadiusValueAnimator != null && mPointAlphaRadiusValueAnimator.isRunning();
+    }
+
+    public void setEndpull(boolean endPull) {
+        this.mPullEnd = endPull;
+    }
+
+    public void stopAnimation() {
+        if (mPointAlphaRadiusValueAnimator != null && mPointAlphaRadiusValueAnimator.isRunning())
+            mPointAlphaRadiusValueAnimator.cancel();
+    }
+
+    public void setAnimationCurrentPlayTime(long time) {
+        if (mPointAlphaRadiusValueAnimator != null) {
+            mPointAlphaRadiusValueAnimator.setCurrentPlayTime(time);
         }
-        return super.onTouchEvent(event);
+    }
+
+    public int getRingRadius() {
+        return mRingRadius;
+    }
+    public void setRingRadius(int ringRadius) {
+        mRingRadius = ringRadius;
+        mRingRadiusONLY=ringRadius;
+    }
+
+    public int getRingColor() {
+        return mRingColor;
+    }
+
+    public void setRingColor(int ringColor) {
+        mRingColor = ringColor;
+    }
+
+    public int getPointColor() {
+        return mPointColor;
+    }
+
+    public void setPointColor(int pointColor) {
+        mPointColor = pointColor;
+    }
+
+    public int getRingTop() {
+        return mRingTop;
+    }
+
+    public void setRingTop(int ringTop) {
+        mRingTop = ringTop;
     }
 
     private class HaloPoint {
@@ -276,19 +263,11 @@ public class HaloRingAnimation extends View {
         float endPos[] = {0, 0};//终点位置坐标
         float startRatio = 0f;
         boolean drawAble = false;
-
-        public float[] getPos() {
-            return pos;
-        }
+        int alpha;
 
         void setPos(float x, float y) {
             this.pos[0] = x;
             this.pos[1] = y;
-        }
-
-
-        public float getRadius() {
-            return radius;
         }
 
         void setRadius(float radius) {

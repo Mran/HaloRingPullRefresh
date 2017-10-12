@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="HaloRingRefreshLayout">
+        <attr name="ringRadius" format="dimension"/>
+        <attr name="ringColor" format="color"/>
+        <attr name="ringTop" format="dimension"/>
+        <attr name="headerHeight" format="dimension"/>
+        <attr name="pointColor" format="color"/>
+    </declare-styleable>
+</resources>
