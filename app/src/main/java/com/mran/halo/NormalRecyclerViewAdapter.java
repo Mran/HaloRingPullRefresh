@@ -12,6 +12,7 @@ public class NormalRecyclerViewAdapter extends RecyclerView.Adapter<NormalRecycl
     private final LayoutInflater mLayoutInflater;
     private final Context mContext;
     private String[] mTitles;
+    private OnRecycleItemClickListener mOnRecycleItemClickListener;
 
     public NormalRecyclerViewAdapter(Context context) {
         mTitles = context.getResources().getStringArray(R.array.titles);
@@ -25,8 +26,22 @@ public class NormalRecyclerViewAdapter extends RecyclerView.Adapter<NormalRecycl
     }
 
     @Override
-    public void onBindViewHolder(NormalTextViewHolder holder, int position) {
+    public void onBindViewHolder(final NormalTextViewHolder holder, final int position) {
         holder.mTextView.setText(mTitles[position]);
+        holder.itemView.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mOnRecycleItemClickListener.onItemClick( holder.mTextView, position);
+            }
+        });
+    }
+
+    public void addListener(OnRecycleItemClickListener OnRecycleItemClickListener) {
+        this.mOnRecycleItemClickListener = OnRecycleItemClickListener;
+    }
+
+    public interface OnRecycleItemClickListener {
+        void onItemClick(View view, int position);
     }
 
     @Override

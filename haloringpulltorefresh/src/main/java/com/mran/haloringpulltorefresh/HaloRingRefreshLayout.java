@@ -25,17 +25,17 @@ public class HaloRingRefreshLayout extends FrameLayout {
     View mChildView;
     HaloRingAnimation mHeaderView;
     private float mInitialDownY;//手指按下的位置
-    private float mTouchSlop = 8;//最小滑动值,用来判断拖动是否有效
+    private float MTOUCHSLOP = 8;//最小滑动值,用来判断拖动是否有效
     private float mInitialMotionY;//开始滑动的位置
-    private float mMaxDragDistance = 280;//childView的最大移动距离
+    private float mMaxDragDistance;//childView的最大移动距离
     private float mPercent = 0.00f;//当前拖动的百分比
     private float dragRatio = 0.3f;//拖动阻力
     private ValueAnimator mBackUpValueAnimator;//向上返回的动画
     private long BACK_UP_DURATION = 350;//返回向上的持续时间
+    private boolean mEnableRefresh = true;
     private boolean mIsRefreshing = false;//正在刷新的标记
     private boolean mIsBeingDragged = false;//是否开始滑动
     private boolean mPullEnd;//下拉到位的标记
-    private float overScrollTop;//当前childView移动的距离
     private int mRingRadius;//0光环的半径
     private int mRingColor;//光环的颜色
     private float mHeaderHeight;//光环的整体view的高度
@@ -89,9 +89,11 @@ public class HaloRingRefreshLayout extends FrameLayout {
             public void onAnimationUpdate(ValueAnimator animation) {
 
                 float offsetUp = mMaxDragDistance * (1.0f - (float) animation.getAnimatedValue());
-                mChildView.setTranslationY(offsetUp);
-                fingerMove(offsetUp);
-                mHeaderView.setPercent(mPercent);
+                if (mChildView != null) {
+                    mChildView.setTranslationY(offsetUp);
+                    fingerMove(offsetUp);
+                    mHeaderView.setPercent(mPercent);
+                }
             }
         });
 
@@ -149,8 +151,8 @@ public class HaloRingRefreshLayout extends FrameLayout {
     @Override
     public boolean onInterceptTouchEvent(MotionEvent event) {
 
-        if (mIsRefreshing) {
-            return true;
+        if (mIsRefreshing || !mEnableRefresh) {
+            return super.onInterceptTouchEvent(event);
         }
         switch (event.getAction()) {
             case MotionEvent.ACTION_DOWN:
@@ -181,14 +183,16 @@ public class HaloRingRefreshLayout extends FrameLayout {
                 startDragging(y);
 
                 if (mIsBeingDragged) {
-                    overScrollTop = (y - mInitialMotionY) * dragRatio;
+                    //加入滑动阻力,计算出控件应该移动的距离
+                    float overScrollTop = (y - mInitialMotionY) * dragRatio;
                     if (overScrollTop > 0) {
                         fingerMove(overScrollTop);
                         mHeaderView.setPercent(mPercent);
                         if (overScrollTop < mMaxDragDistance) {
                             if (!mHeaderView.isAnimationRunning())
                                 mHeaderView.startAnimation();
-                            mChildView.setTranslationY(overScrollTop);
+                            if (mChildView != null)
+                                mChildView.setTranslationY(overScrollTop);
                         }
                     } else {
                         return false;
@@ -198,6 +202,7 @@ public class HaloRingRefreshLayout extends FrameLayout {
             case MotionEvent.ACTION_CANCEL:
             case MotionEvent.ACTION_UP:
                 mIsBeingDragged = false;
+                //根据不同的滑动程度来确定不同的手指离开后的效果
                 if (mPercent == 1) {
                     mPullEnd = true;
                     mIsRefreshing = true;
@@ -223,11 +228,12 @@ public class HaloRingRefreshLayout extends FrameLayout {
         dragRatio = 0.5f - 0.15f * mPercent;//产生拖动的阻力效果
 
     }
+
     //判断是否在滑动
     private void startDragging(float y) {
         final float yDiff = y - mInitialDownY;
-        if (yDiff > mTouchSlop && !mIsBeingDragged) {
-            mInitialMotionY = mInitialDownY + mTouchSlop;
+        if (yDiff > MTOUCHSLOP && !mIsBeingDragged) {
+            mInitialMotionY = mInitialDownY + MTOUCHSLOP;
             mIsBeingDragged = true;
             mPullEnd = false;
         }
@@ -238,7 +244,7 @@ public class HaloRingRefreshLayout extends FrameLayout {
         mRingRadius = (int) typedArray.getDimension(R.styleable.HaloRingRefreshLayout_ringRadius, 50);
         mRingTop = (int) typedArray.getDimension(R.styleable.HaloRingRefreshLayout_ringTop, 120);
         mRingColor = typedArray.getColor(R.styleable.HaloRingRefreshLayout_ringColor, 0xFF828EFA);
-        mHeaderHeight = typedArray.getDimension(R.styleable.HaloRingRefreshLayout_headerHeight, mMaxDragDistance);
+        mHeaderHeight = typedArray.getDimension(R.styleable.HaloRingRefreshLayout_headerHeight, 280);
         mPointColor = typedArray.getColor(R.styleable.HaloRingRefreshLayout_pointColor, 0xFF828EFA);
         mMaxDragDistance = mHeaderHeight;
         typedArray.recycle();
@@ -268,6 +274,14 @@ public class HaloRingRefreshLayout extends FrameLayout {
 
     public boolean isPullEnd() {
         return mPullEnd;
+    }
+
+    public boolean isEnableRefresh() {
+        return mEnableRefresh;
+    }
+
+    public void setEnableRefresh(boolean enableRefresh) {
+        mEnableRefresh = enableRefresh;
     }
 
     public void stopRefresh() {
